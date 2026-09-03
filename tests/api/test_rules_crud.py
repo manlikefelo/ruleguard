@@ -77,7 +77,9 @@ def test_get_rule_returns_the_created_rule(client, tenant_a_headers):
 
 def test_get_unknown_rule_returns_404(client, tenant_a_headers):
     """RG-API-006: an id that was never issued gives 404."""
-    response = client.get("/api/v1/rules/00000000-0000-0000-0000-000000000000", headers=tenant_a_headers)
+    response = client.get(
+        "/api/v1/rules/00000000-0000-0000-0000-000000000000", headers=tenant_a_headers
+    )
     assert response.status_code == 404
 
 
@@ -188,8 +190,12 @@ def test_delete_is_not_idempotent_on_the_second_call(client, tenant_a_headers):
     """RG-API-014: deleting the same rule twice gives 204 then 404."""
     created = client.post("/api/v1/rules", json=make_rule(), headers=tenant_a_headers).json()
 
-    assert client.delete(f"/api/v1/rules/{created['id']}", headers=tenant_a_headers).status_code == 204
-    assert client.delete(f"/api/v1/rules/{created['id']}", headers=tenant_a_headers).status_code == 404
+    assert (
+        client.delete(f"/api/v1/rules/{created['id']}", headers=tenant_a_headers).status_code == 204
+    )
+    assert (
+        client.delete(f"/api/v1/rules/{created['id']}", headers=tenant_a_headers).status_code == 404
+    )
 
 
 def test_enabled_defaults_to_true_when_omitted(client, tenant_a_headers):

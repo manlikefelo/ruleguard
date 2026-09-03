@@ -1,0 +1,240 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RuleGuard</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 2rem; background: #f6f7f9; color: #1d2129; }
+  h1 { margin: 0 0 0.25rem; font-size: 1.5rem; }
+  .sub { color: #5c6470; margin: 0 0 1.5rem; font-size: 0.9rem; }
+  fieldset { border: 1px solid #d8dce2; border-radius: 6px; background: #fff; margin: 0 0 1.5rem; padding: 1rem; }
+  legend { font-weight: 600; padding: 0 0.4rem; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem; }
+  label { display: block; font-size: 0.8rem; color: #5c6470; margin-bottom: 0.2rem; }
+  input, select { width: 100%; padding: 0.4rem; border: 1px solid #ccd1d9; border-radius: 4px; font: inherit; box-sizing: border-box; }
+  button { padding: 0.5rem 1rem; border: 0; border-radius: 4px; background: #2a6fdb; color: #fff; font: inherit; cursor: pointer; }
+  button.danger { background: #c0392b; padding: 0.25rem 0.6rem; font-size: 0.8rem; }
+  table { width: 100%; border-collapse: collapse; background: #fff; }
+  th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #e6e9ed; font-size: 0.85rem; }
+  th { background: #eef1f5; }
+  #error-banner { display: none; background: #fdecea; border: 1px solid #f5c6c2; color: #8b1a12; padding: 0.75rem; border-radius: 4px; margin-bottom: 1rem; }
+  .finding { border-left: 4px solid #999; background: #fff; padding: 0.6rem 0.8rem; margin-bottom: 0.5rem; font-size: 0.85rem; }
+  .finding.critical { border-left-color: #c0392b; }
+  .finding.high { border-left-color: #e67e22; }
+  .finding.medium { border-left-color: #d4ac0d; }
+  .empty { color: #5c6470; font-size: 0.85rem; }
+</style>
+
+<h1>RuleGuard</h1>
+<p class="sub">Firewall policy analysis: shadowed, redundant and overly permissive rules.</p>
+
+<div id="error-banner" data-testid="error-banner" role="alert"></div>
+
+<fieldset>
+  <legend>Connection</legend>
+  <label for="api-key">API key</label>
+  <input id="api-key" data-testid="api-key-input" value="key-acme-001" autocomplete="off">
+  <p class="sub" style="margin:0.5rem 0 0">Rules are scoped to the tenant that owns this key.</p>
+</fieldset>
+
+<fieldset>
+  <legend>Add a rule</legend>
+  <div class="grid">
+    <div><label for="name">Name</label><input id="name" data-testid="rule-name-input" value="allow-web-dmz"></div>
+    <div><label for="priority">Priority</label><input id="priority" data-testid="rule-priority-input" type="number" value="100"></div>
+    <div><label for="source">Source</label><input id="source" data-testid="rule-source-input" value="10.0.0.0/24"></div>
+    <div><label for="destination">Destination</label><input id="destination" data-testid="rule-destination-input" value="10.1.0.0/24"></div>
+    <div>
+      <label for="protocol">Protocol</label>
+      <select id="protocol" data-testid="rule-protocol-input">
+        <option>tcp</option><option>udp</option><option>icmp</option><option>any</option>
+      </select>
+    </div>
+    <div><label for="port-start">Port start</label><input id="port-start" data-testid="rule-port-start-input" type="number" value="80"></div>
+    <div><label for="port-end">Port end</label><input id="port-end" data-testid="rule-port-end-input" type="number" value="443"></div>
+    <div>
+      <label for="action">Action</label>
+      <select id="action" data-testid="rule-action-input"><option>allow</option><option>deny</option></select>
+    </div>
+    <div>
+      <label for="enabled">Enabled</label>
+      <select id="enabled" data-testid="rule-enabled-input"><option value="true">true</option><option value="false">false</option></select>
+    </div>
+  </div>
+  <p style="margin:1rem 0 0"><button data-testid="add-rule-btn" onclick="addRule()">Add rule</button></p>
+</fieldset>
+
+<fieldset>
+  <legend>Rules</legend>
+  <table data-testid="rules-table">
+    <thead>
+      <tr><th>Name</th><th>Priority</th><th>Source</th><th>Destination</th><th>Proto</th><th>Ports</th><th>Action</th><th>Enabled</th><th></th></tr>
+    </thead>
+    <tbody id="rules-body"></tbody>
+  </table>
+  <p id="rules-empty" class="empty" data-testid="rules-empty">No rules yet.</p>
+</fieldset>
+
+<fieldset>
+  <legend>Analysis</legend>
+  <p style="margin:0 0 1rem"><button data-testid="analyze-btn" onclick="runAnalysis()">Analyze</button></p>
+  <div data-testid="findings-panel" id="findings-panel"><p class="empty">Not run yet.</p></div>
+</fieldset>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const key = () => $("api-key").value;
+
+  function showError(message) {
+    const banner = $("error-banner");
+    // textContent, not innerHTML. Rule names are attacker-controlled text and
+    // an error body can echo one back, so it is never parsed as markup.
+    banner.textContent = message;
+    banner.style.display = "block";
+  }
+
+  function clearError() {
+    const banner = $("error-banner");
+    banner.textContent = "";
+    banner.style.display = "none";
+  }
+
+  async function request(path, options = {}) {
+    const response = await fetch(path, {
+      ...options,
+      headers: { "Content-Type": "application/json", "X-API-Key": key() },
+    });
+    if (!response.ok) {
+      let detail = `Request failed with status ${response.status}`;
+      try {
+        const body = await response.json();
+        if (typeof body.detail === "string") {
+          detail = body.detail;
+        } else if (Array.isArray(body.detail) && body.detail.length) {
+          const first = body.detail[0];
+          detail = `${(first.loc || []).slice(1).join(".")}: ${first.msg}`;
+        }
+      } catch (err) {
+        /* response had no JSON body, keep the status message */
+      }
+      throw new Error(detail);
+    }
+    return response.status === 204 ? null : response.json();
+  }
+
+  function cell(row, text) {
+    const td = document.createElement("td");
+    td.textContent = text;
+    row.appendChild(td);
+    return td;
+  }
+
+  async function loadRules() {
+    const body = $("rules-body");
+    body.replaceChildren();
+    let rules;
+    try {
+      rules = await request("/api/v1/rules");
+    } catch (err) {
+      showError(err.message);
+      return;
+    }
+    $("rules-empty").style.display = rules.length ? "none" : "block";
+
+    for (const rule of rules) {
+      const row = document.createElement("tr");
+      row.dataset.testid = `rule-row-${rule.id}`;
+      cell(row, rule.name).dataset.testid = `rule-name-${rule.id}`;
+      cell(row, rule.priority);
+      cell(row, rule.source);
+      cell(row, rule.destination);
+      cell(row, rule.protocol);
+      cell(row, `${rule.port_start}-${rule.port_end}`);
+      cell(row, rule.action);
+      cell(row, String(rule.enabled));
+
+      const actions = document.createElement("td");
+      const button = document.createElement("button");
+      button.className = "danger";
+      button.textContent = "Delete";
+      button.dataset.testid = `delete-rule-${rule.id}`;
+      button.onclick = () => deleteRule(rule.id);
+      actions.appendChild(button);
+      row.appendChild(actions);
+
+      body.appendChild(row);
+    }
+  }
+
+  async function addRule() {
+    clearError();
+    const payload = {
+      name: $("name").value,
+      priority: Number($("priority").value),
+      source: $("source").value,
+      destination: $("destination").value,
+      protocol: $("protocol").value,
+      port_start: Number($("port-start").value),
+      port_end: Number($("port-end").value),
+      action: $("action").value,
+      enabled: $("enabled").value === "true",
+    };
+    try {
+      await request("/api/v1/rules", { method: "POST", body: JSON.stringify(payload) });
+    } catch (err) {
+      showError(err.message);
+      return;
+    }
+    await loadRules();
+  }
+
+  async function deleteRule(id) {
+    clearError();
+    try {
+      await request(`/api/v1/rules/${id}`, { method: "DELETE" });
+    } catch (err) {
+      showError(err.message);
+      return;
+    }
+    await loadRules();
+  }
+
+  async function runAnalysis() {
+    clearError();
+    const panel = $("findings-panel");
+    panel.replaceChildren();
+    let result;
+    try {
+      result = await request("/api/v1/analysis");
+    } catch (err) {
+      showError(err.message);
+      return;
+    }
+
+    if (!result.findings.length) {
+      const clean = document.createElement("p");
+      clean.className = "empty";
+      clean.dataset.testid = "no-findings";
+      clean.textContent = `No findings across ${result.rule_count} rules.`;
+      panel.appendChild(clean);
+      return;
+    }
+
+    for (const finding of result.findings) {
+      const item = document.createElement("div");
+      item.className = `finding ${finding.severity}`;
+      item.dataset.testid = `finding-${finding.type}`;
+
+      const heading = document.createElement("strong");
+      heading.textContent = `${finding.type} (${finding.severity})`;
+      item.appendChild(heading);
+
+      const message = document.createElement("div");
+      message.dataset.testid = "finding-message";
+      message.textContent = finding.message;
+      item.appendChild(message);
+
+      panel.appendChild(item);
+    }
+  }
+
+  loadRules();
+</script>

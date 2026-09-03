@@ -222,9 +222,7 @@ def test_bulk_created_rules_belong_to_the_calling_tenant(
     client, tenant_a_headers, tenant_b_headers
 ):
     """RG-API-076: bulk creation honours tenant scoping like the single endpoint."""
-    client.post(
-        "/api/v1/rules/bulk", json=[make_rule(name="acme-bulk")], headers=tenant_a_headers
-    )
+    client.post("/api/v1/rules/bulk", json=[make_rule(name="acme-bulk")], headers=tenant_a_headers)
 
     assert client.get("/api/v1/rules", headers=tenant_b_headers).json() == []
     a_rules = client.get("/api/v1/rules", headers=tenant_a_headers).json()

@@ -221,9 +221,7 @@ def test_tenant_id_injection_on_update_is_rejected(client, tenant_a_headers):
 
     payload = make_rule(name="moved")
     payload["tenant_id"] = "tenant-globex"
-    response = client.put(
-        f"/api/v1/rules/{created['id']}", json=payload, headers=tenant_a_headers
-    )
+    response = client.put(f"/api/v1/rules/{created['id']}", json=payload, headers=tenant_a_headers)
     assert response.status_code == 422
 
     unchanged = client.get(f"/api/v1/rules/{created['id']}", headers=tenant_a_headers).json()

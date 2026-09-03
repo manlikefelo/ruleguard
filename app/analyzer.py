@@ -153,9 +153,7 @@ def analyze(rules: list[Rule]) -> list[Finding]:
                 severity="medium",
                 rule_id=rule.id,
                 duplicate_of=original.id,
-                message=(
-                    f"Rule '{rule.name}' duplicates higher-priority rule '{original.name}'."
-                ),
+                message=(f"Rule '{rule.name}' duplicates higher-priority rule '{original.name}'."),
             )
         )
 

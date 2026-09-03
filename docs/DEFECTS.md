@@ -1,11 +1,15 @@
 # Defect log
 
-Five defects found by running the test suite against the first working build of
-the analyzer. All five were written up before any fix went in, which is why the
-evidence sections quote failing output rather than describing it.
+Six defects found by running the test suite. The first five came out of the
+initial run against the first working build of the analyzer. RG-BUG-006 turned
+up later, when the layers were run together for the first time, and is a fault
+in the test framework rather than in the application.
 
-Baseline commit for every report below: `110ae71`. Environment: Windows 10,
-Python 3.12.10, pytest 8.3.4, run locally.
+Every one was written up before the fix went in, which is why the evidence
+sections quote failing output rather than describing it.
+
+Baseline commit for RG-BUG-001 to RG-BUG-005: `110ae71`. Environment: Windows
+10, Python 3.12.10, pytest 8.3.4, run locally.
 
 Summary:
 
@@ -16,10 +20,11 @@ Summary:
 | RG-BUG-003 | Permissive rules written as `0.0.0.0/0` are not reported | High | analyzer | Fixed |
 | RG-BUG-004 | Rule covered by two broader rules is reported twice | Medium | analyzer | Fixed |
 | RG-BUG-005 | Duplicate rules at equal priority are never reported | Medium | analyzer | Fixed |
+| RG-BUG-006 | Full suite deadlocks when API tests run before UI tests | High | test framework | Fixed |
 
 ---
 
-### RG-BUG-001 — Malformed CIDR is accepted on create and crashes the analysis endpoint
+### RG-BUG-001: Malformed CIDR is accepted on create and crashes the analysis endpoint
 
 **Severity:** Critical **Priority:** P1 **Component:** app/models.py, app/analyzer.py
 **Environment:** local, Python 3.12.10, commit `110ae71`
@@ -61,7 +66,7 @@ model. Nothing parsed them until `_to_network` did, deep inside the analyzer,
 by which point the bad value was already persisted and there was no route-level
 handler to turn a parse failure into a 4xx.
 
-**Fix:** added a field validator on `RuleCreate` that runs the value through
+**Fix:** commit `d85cc30`. Added a field validator on `RuleCreate` that runs the value through
 `ipaddress.IPv4Network` at creation time and rejects anything that does not
 parse, including IPv6 input, with an explicit message. Validation now happens
 once at the boundary rather than on every analysis run.
@@ -71,7 +76,7 @@ once at the boundary rather than on every analysis run.
 
 ---
 
-### RG-BUG-002 — Port ranges that touch at one end are not treated as overlapping
+### RG-BUG-002: Port ranges that touch at one end are not treated as overlapping
 
 **Severity:** High **Priority:** P2 **Component:** app/analyzer.py
 **Environment:** local, Python 3.12.10, commit `110ae71`
@@ -104,7 +109,7 @@ using strict inequalities on a range whose bounds are inclusive. Where the two
 ranges share exactly one port, both comparisons fail. Where a range is a single
 port, `a_start < a_end` is false by definition.
 
-**Fix:** changed both comparisons to `<=`, giving
+**Fix:** commit `d85cc30`. Changed both comparisons to `<=`, giving
 `a_start <= b_end and b_start <= a_end`. The adjacent-range cases such as 80-443
 against 444-500 still correctly report no overlap.
 
@@ -112,7 +117,7 @@ against 444-500 still correctly report no overlap.
 
 ---
 
-### RG-BUG-003 — Overly permissive rules written as 0.0.0.0/0 are not reported
+### RG-BUG-003: Overly permissive rules written as 0.0.0.0/0 are not reported
 
 **Severity:** High **Priority:** P2 **Component:** app/analyzer.py
 **Environment:** local, Python 3.12.10, commit `110ae71`
@@ -145,7 +150,7 @@ strings against the literal `"any"`. Every other part of the analyzer goes
 through `_to_network`, which already treats the two spellings as equivalent;
 this one check compared raw strings instead.
 
-**Fix:** added an `_is_any_network` helper that parses the value and tests
+**Fix:** commit `d85cc30`. Added an `_is_any_network` helper that parses the value and tests
 whether it covers the entire address space, then used it for both the source and
 the destination check. Any future spelling that parses to 0.0.0.0/0 is now
 handled without another change.
@@ -154,7 +159,7 @@ handled without another change.
 
 ---
 
-### RG-BUG-004 — A rule shadowed by two broader rules is reported twice
+### RG-BUG-004: A rule shadowed by two broader rules is reported twice
 
 **Severity:** Medium **Priority:** P3 **Component:** app/analyzer.py
 **Environment:** local, Python 3.12.10, commit `110ae71`
@@ -184,7 +189,7 @@ twice.
 rule it finds rather than stopping at the first one. There is no deduplication
 by `rule_id`.
 
-**Fix:** the loop now records the highest-priority covering rule for each
+**Fix:** commit `d85cc30`. The loop now records the highest-priority covering rule for each
 shadowed rule and emits a single finding naming it. Reporting the highest
 priority one is the useful choice: that is the rule the operator has to change
 for the shadowed rule to come alive.
@@ -193,7 +198,7 @@ for the shadowed rule to come alive.
 
 ---
 
-### RG-BUG-005 — Duplicate rules at the same priority are never reported
+### RG-BUG-005: Duplicate rules at the same priority are never reported
 
 **Severity:** Medium **Priority:** P3 **Component:** app/analyzer.py
 **Environment:** local, Python 3.12.10, commit `110ae71`
@@ -224,7 +229,7 @@ source and destination as raw strings, so a pair written as `any` and
 `0.0.0.0/0` is not recognised as duplicated even though the two rules select
 identical traffic. Same underlying cause as RG-BUG-003, fixed in the same pass.
 
-**Fix:** replaced the priority guard with a comparison that breaks the tie on
+**Fix:** commit `d85cc30`. Replaced the priority guard with a comparison that breaks the tie on
 rule id when priorities are equal, so exactly one of the pair is reported and
 the choice is stable across runs. Network comparison in `is_duplicate` now goes
 through parsed networks rather than string equality.
@@ -233,10 +238,81 @@ through parsed networks rather than string equality.
 
 ---
 
+### RG-BUG-006: Full suite deadlocks when the API tests run before the UI tests
+
+**Severity:** High **Priority:** P2 **Component:** test framework
+**Environment:** local, Python 3.12.10, Windows 10, commit `d85cc30`
+
+This one is a defect in the test suite rather than in the application. It is
+recorded here because a suite that hangs is a worse problem than most product
+bugs: nobody can tell whether the code is broken or the harness is.
+
+**Steps to reproduce:**
+
+1. `pytest tests/unit` passes in about 0.5 seconds.
+2. `pytest tests/api` passes in about 3 seconds.
+3. `pytest tests/ui` passes in about 22 seconds.
+4. `pytest tests` hangs indefinitely at the first UI test.
+
+**Expected:** the full suite completes. Each layer passes in isolation, so the
+combination should too.
+
+**Actual:** the run stops at
+`tests/ui/test_rules_ui.py::test_page_loads_with_an_empty_rule_table` and never
+returns. No failure and no error, so CI would sit at the job timeout rather
+than reporting anything useful.
+
+**Evidence:** `pytest-timeout` was installed temporarily to get a traceback out
+of the stalled run:
+
+```
+tests/api/test_validation.py::test_ipv6_source_is_rejected_with_a_clear_error PASSED [ 48%]
+tests/ui/test_rules_ui.py::test_page_loads_with_an_empty_rule_table[chromium]
++++++++++++++++++++++++++++++++++++ Timeout +++++++++++++++++++++++++++++++++++
+    event_list = self._selector.select(timeout)
+    self._poll(timeout)
+```
+
+Narrowed with a two-test probe file: a test using `TestClient` followed by a
+test using the `live_server` fixture reproduces it every time, while either one
+alone passes. Playwright plus `TestClient` with no `live_server` also passes,
+which ruled out the browser as the cause.
+
+**Root cause:** `live_server` started uvicorn in a background thread inside the
+test process. FastAPI's `TestClient` drives the app through an anyio portal on
+the main thread and leaves event loop state behind after the API tests finish.
+Starting uvicorn in a thread afterwards blocks during startup, waiting on a
+selector that never fires. Setting an explicit event loop in the server thread
+was not enough; the coupling is through process-level state, not the loop
+object.
+
+**Fix:** commit pending. `live_server` now runs uvicorn as a subprocess, which
+shares no event loop state with the test process. Startup polls `/health` until
+it answers, with a deadline that fails the fixture rather than hanging.
+
+The change has a consequence worth naming: the server no longer shares the
+in-process repository, so the root `clean_store` fixture cannot reset what the
+browser sees. A `reset_server_state` autouse fixture in the UI conftest now
+deletes every rule from all three tenants over HTTP before and after each test,
+which keeps the UI layer order independent by the same rule as the rest.
+
+A second, smaller issue surfaced during the fix: the subprocess `stdout` pipe
+was left for the garbage collector, which raised `ResourceWarning` partway
+through a later unit test. Since `pytest.ini` sets `filterwarnings = error`,
+that surfaced as an error attributed to an unrelated test. The pipe is now
+closed explicitly in teardown.
+
+**Regression test:** covered by CI running `pytest tests/unit tests/api` and
+`pytest tests/ui` in the same workflow, and by the full-suite run used to verify
+the fix (301 passed in 49.74s).
+
+---
+
 ## Notes on triage
 
-Twenty-three tests failed on the first full run. Three of those were faults in
-the tests rather than the code, and are recorded here so the count reconciles:
+Across the first unit and API runs, eight distinct failure causes turned up.
+Five were product defects, written up above. The other three were faults in the
+tests themselves, recorded here so the triage is honest about the split:
 
 - `test_priority_comparison_boundaries` passed zero and negative priorities to a
   model that validates `priority >= 1`, so the factory raised `ValidationError`
