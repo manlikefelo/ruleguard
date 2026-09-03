@@ -286,7 +286,7 @@ selector that never fires. Setting an explicit event loop in the server thread
 was not enough; the coupling is through process-level state, not the loop
 object.
 
-**Fix:** commit pending. `live_server` now runs uvicorn as a subprocess, which
+**Fix:** commit `1c2ef12`. `live_server` now runs uvicorn as a subprocess, which
 shares no event loop state with the test process. Startup polls `/health` until
 it answers, with a deadline that fails the fixture rather than hanging.
 
