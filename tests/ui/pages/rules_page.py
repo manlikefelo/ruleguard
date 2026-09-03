@@ -36,6 +36,22 @@ class RulesPage(BasePage):
     def error_banner(self) -> Locator:
         return self.by_testid("error-banner")
 
+    @property
+    def rows(self) -> Locator:
+        """Every data row currently rendered in the rules table."""
+        return self.rules_table.locator("tbody tr")
+
+    def row_at(self, index: int) -> Locator:
+        return self.rows.nth(index)
+
+    def injected_script_tags(self) -> Locator:
+        """Script elements a rule name may have tried to introduce.
+
+        Used by the escaping test to prove a payload was rendered as text
+        rather than parsed into the document.
+        """
+        return self.page.locator("script#injected")
+
     def rule_row(self, rule_id: str) -> Locator:
         return self.by_testid(f"rule-row-{rule_id}")
 
@@ -82,11 +98,15 @@ class RulesPage(BasePage):
     # -------------------------------------------------------------- queries
 
     def row_count(self) -> int:
-        return self.rules_table.locator("tbody tr").count()
+        return self.rows.count()
 
     def rule_names(self) -> list[str]:
         cells = self.rules_table.locator("tbody tr td:first-child")
         return [cells.nth(i).inner_text() for i in range(cells.count())]
+
+    def named_row(self, name: str) -> Locator:
+        """The table cell showing a given rule name."""
+        return self.rules_table.get_by_text(name)
 
     def get_findings(self) -> list[str]:
         messages = self.findings_panel.get_by_test_id("finding-message")

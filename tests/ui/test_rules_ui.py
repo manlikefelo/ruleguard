@@ -26,7 +26,7 @@ def test_add_a_rule_and_see_it_in_the_table(rules_page):
     """RG-UI-002: a rule submitted through the form appears in the table."""
     rules_page.add_rule(name="ui-created-rule", priority=42)
 
-    expect(rules_page.rules_table.get_by_text("ui-created-rule")).to_be_visible()
+    expect(rules_page.named_row("ui-created-rule")).to_be_visible()
     expect(rules_page.by_testid("rules-empty")).to_be_hidden()
 
 
@@ -43,7 +43,7 @@ def test_added_rule_shows_the_values_that_were_entered(rules_page):
         action="deny",
     )
 
-    row = rules_page.rules_table.locator("tbody tr").first
+    row = rules_page.row_at(0)
     expect(row).to_contain_text("dns-egress")
     expect(row).to_contain_text("192.168.10.0/24")
     expect(row).to_contain_text("udp")
@@ -74,9 +74,9 @@ def test_deleting_one_rule_leaves_the_others(rules_page, api_seed):
 
     rules_page.delete_rule(doomed)
 
-    expect(rules_page.rules_table.locator("tbody tr")).to_have_count(2)
-    expect(rules_page.rules_table.get_by_text("keep-one")).to_be_visible()
-    expect(rules_page.rules_table.get_by_text("keep-two")).to_be_visible()
+    expect(rules_page.rows).to_have_count(2)
+    expect(rules_page.named_row("keep-one")).to_be_visible()
+    expect(rules_page.named_row("keep-two")).to_be_visible()
 
 
 def test_run_analysis_shows_findings(rules_page, api_seed):
@@ -162,7 +162,7 @@ def test_validation_error_is_shown_to_the_user(rules_page):
 
     expect(rules_page.error_banner).to_be_visible()
     expect(rules_page.error_banner).to_contain_text("port_end")
-    expect(rules_page.rules_table.locator("tbody tr")).to_have_count(0)
+    expect(rules_page.rows).to_have_count(0)
 
 
 def test_error_banner_clears_after_a_successful_action(rules_page):
@@ -173,7 +173,7 @@ def test_error_banner_clears_after_a_successful_action(rules_page):
     rules_page.add_rule(name="good-rule", port_start=80, port_end=443)
 
     expect(rules_page.error_banner).to_be_hidden()
-    expect(rules_page.rules_table.get_by_text("good-rule")).to_be_visible()
+    expect(rules_page.named_row("good-rule")).to_be_visible()
 
 
 @pytest.mark.security
@@ -199,7 +199,7 @@ def test_script_payloads_in_rule_names_are_rendered_as_text(rules_page, api_seed
 
     expect(rules_page.rule_name_cell(rule_id)).to_have_text(payload_name)
     assert rules_page.page.evaluate("() => window.__pwned === undefined") is True
-    assert rules_page.page.locator("script#injected").count() == 0
+    assert rules_page.injected_script_tags().count() == 0
 
 
 @pytest.mark.security

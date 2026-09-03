@@ -51,9 +51,11 @@ def live_server() -> str:
         stderr=subprocess.STDOUT,
     )
 
-    # Poll /health until it answers rather than sleeping a fixed amount. The
-    # deadline is what fails the fixture, so a server that never comes up
-    # produces a clear error instead of a hung test run.
+    # Poll /health until it answers. There is no sleep in this loop: the
+    # connection attempt itself carries the timeout, so a server that is not
+    # listening yet costs one refused connection per pass rather than a fixed
+    # wait. The deadline is what fails the fixture, so a server that never
+    # comes up produces a clear error instead of a hung test run.
     deadline = time.monotonic() + 30
     while True:
         if process.poll() is not None:
@@ -66,7 +68,7 @@ def live_server() -> str:
             if httpx.get(f"{base_url}/health", timeout=1).status_code == 200:
                 break
         except httpx.HTTPError:
-            time.sleep(0.1)
+            continue
 
     yield base_url
 
