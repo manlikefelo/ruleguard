@@ -37,9 +37,23 @@ def network_contains(outer: str, inner: str) -> bool:
     return net_inner.subnet_of(net_outer)
 
 
+def _is_any_network(value: str) -> bool:
+    """True if the value covers the entire IPv4 address space.
+
+    Fixes part of RG-BUG-003. 'any' and '0.0.0.0/0' select the same traffic,
+    and a rule base exported from a device uses the second spelling.
+    """
+    return _to_network(value).prefixlen == 0
+
+
 def ports_overlap(a_start: int, a_end: int, b_start: int, b_end: int) -> bool:
-    """True if the two inclusive port ranges share at least one port."""
-    return a_start < b_end and b_start < a_end
+    """True if the two inclusive port ranges share at least one port.
+
+    Fixes RG-BUG-002. This used strict less-than, which meant 80-443 and
+    443-500 were judged not to overlap despite both containing port 443, and a
+    single-port range did not overlap itself.
+    """
+    return a_start <= b_end and b_start <= a_end
 
 
 def ports_contain(outer_start: int, outer_end: int, inner_start: int, inner_end: int) -> bool:
@@ -66,10 +80,15 @@ def is_shadowed_by(later: Rule, earlier: Rule) -> bool:
 
 
 def is_duplicate(a: Rule, b: Rule) -> bool:
-    """True if two rules have identical match criteria and the same action."""
+    """True if two rules have identical match criteria and the same action.
+
+    Networks are compared as parsed values rather than as strings, so a pair
+    written as 'any' and '0.0.0.0/0' is recognised as duplicated. That was the
+    second half of RG-BUG-005.
+    """
     return (
-        a.source == b.source
-        and a.destination == b.destination
+        _to_network(a.source) == _to_network(b.source)
+        and _to_network(a.destination) == _to_network(b.destination)
         and a.protocol == b.protocol
         and a.port_start == b.port_start
         and a.port_end == b.port_end
@@ -81,8 +100,8 @@ def is_overly_permissive(rule: Rule) -> bool:
     """True if the rule allows anything from anywhere to anywhere."""
     return (
         rule.action == "allow"
-        and rule.source == "any"
-        and rule.destination == "any"
+        and _is_any_network(rule.source)
+        and _is_any_network(rule.destination)
         and rule.port_start == 0
         and rule.port_end == 65535
     )
@@ -93,41 +112,52 @@ def analyze(rules: list[Rule]) -> list[Finding]:
     findings: list[Finding] = []
     enabled = [r for r in rules if r.enabled]
 
+    # Shadowing. A rule covered by several broader rules gets one finding
+    # naming the highest-priority cover, since that is the rule an operator
+    # has to change for the shadowed rule to come alive again (RG-BUG-004).
     for rule in enabled:
-        for other in enabled:
-            if other.id == rule.id:
-                continue
-            if is_shadowed_by(rule, other):
-                findings.append(
-                    Finding(
-                        type="SHADOWED",
-                        severity="high",
-                        rule_id=rule.id,
-                        shadowed_by=other.id,
-                        message=(
-                            f"Rule '{rule.name}' is fully shadowed by "
-                            f"higher-priority rule '{other.name}'."
-                        ),
-                    )
-                )
+        covers = [other for other in enabled if other.id != rule.id and is_shadowed_by(rule, other)]
+        if not covers:
+            continue
+        cover = min(covers, key=lambda r: (r.priority, r.id))
+        findings.append(
+            Finding(
+                type="SHADOWED",
+                severity="high",
+                rule_id=rule.id,
+                shadowed_by=cover.id,
+                message=(
+                    f"Rule '{rule.name}' is fully shadowed by "
+                    f"higher-priority rule '{cover.name}'."
+                ),
+            )
+        )
 
+    # Redundancy. Exactly one rule of a duplicate pair is reported. Priority
+    # decides which, and the rule id breaks a tie so that two rules at the
+    # same priority still produce a finding, deterministically (RG-BUG-005).
     for rule in enabled:
-        for other in enabled:
-            if other.id == rule.id:
-                continue
-            if is_duplicate(rule, other) and other.priority < rule.priority:
-                findings.append(
-                    Finding(
-                        type="REDUNDANT",
-                        severity="medium",
-                        rule_id=rule.id,
-                        duplicate_of=other.id,
-                        message=(
-                            f"Rule '{rule.name}' duplicates higher-priority "
-                            f"rule '{other.name}'."
-                        ),
-                    )
-                )
+        duplicates = [
+            other
+            for other in enabled
+            if other.id != rule.id
+            and is_duplicate(rule, other)
+            and (other.priority, other.id) < (rule.priority, rule.id)
+        ]
+        if not duplicates:
+            continue
+        original = min(duplicates, key=lambda r: (r.priority, r.id))
+        findings.append(
+            Finding(
+                type="REDUNDANT",
+                severity="medium",
+                rule_id=rule.id,
+                duplicate_of=original.id,
+                message=(
+                    f"Rule '{rule.name}' duplicates higher-priority rule '{original.name}'."
+                ),
+            )
+        )
 
     for rule in rules:
         if is_overly_permissive(rule):
@@ -143,4 +173,8 @@ def analyze(rules: list[Rule]) -> list[Finding]:
                 )
             )
 
+    # Sort before returning. The rules arrive from a dict-backed store, so
+    # without this the report order tracks insertion order and two audits of
+    # the same policy can disagree on presentation.
+    findings.sort(key=lambda f: (f.type, f.rule_id))
     return findings

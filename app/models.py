@@ -1,11 +1,35 @@
 """Pydantic models for firewall rules and analysis output."""
 
+import ipaddress
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 Protocol = Literal["tcp", "udp", "icmp", "any"]
 Action = Literal["allow", "deny"]
+
+ANY_KEYWORD = "any"
+
+
+def validate_network(value: str) -> str:
+    """Reject anything that is not a parseable IPv4 network or the any keyword.
+
+    Fixes RG-BUG-001. These fields used to be plain strings, so a value like
+    10.0.0.0/33 was stored happily and then blew up inside the analyzer on the
+    next run. Parsing here means a bad network is refused once, at creation,
+    instead of breaking every later analysis of that rule base.
+    """
+    if value == ANY_KEYWORD:
+        return value
+    try:
+        ipaddress.IPv4Network(value)
+    except ipaddress.AddressValueError as exc:
+        raise ValueError(f"{value!r} is not a valid IPv4 network: {exc}") from exc
+    except ipaddress.NetmaskValueError as exc:
+        raise ValueError(f"{value!r} has an invalid netmask: {exc}") from exc
+    except ValueError as exc:
+        raise ValueError(f"{value!r} is not a valid IPv4 network: {exc}") from exc
+    return value
 
 
 class RuleCreate(BaseModel):
@@ -26,6 +50,11 @@ class RuleCreate(BaseModel):
     port_end: int = Field(ge=0, le=65535)
     action: Action
     enabled: bool = True
+
+    @field_validator("source", "destination")
+    @classmethod
+    def check_network(cls, value: str) -> str:
+        return validate_network(value)
 
     @model_validator(mode="after")
     def check_port_order(self) -> "RuleCreate":

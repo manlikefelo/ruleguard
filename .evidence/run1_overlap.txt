@@ -1,6 +1,0 @@
-FAILED tests/unit/test_overlap.py::test_ports_overlap_truth_table[touching-ranges-share-443]
-FAILED tests/unit/test_overlap.py::test_ports_overlap_truth_table[same-single-port]
-FAILED tests/unit/test_overlap.py::test_ports_overlap_truth_table[port-zero-only]
-FAILED tests/unit/test_overlap.py::test_ports_overlap_truth_table[port-65535-only]
-FAILED tests/unit/test_overlap.py::test_ports_overlap_truth_table[ranges-touch-at-100]
-5 failed, 60 passed in 0.25s
