@@ -1,0 +1,300 @@
+{
+  "empty": [],
+
+  "single_rule": [
+    {
+      "name": "allow-web-dmz",
+      "priority": 100,
+      "source": "10.0.0.0/24",
+      "destination": "10.1.0.0/24",
+      "protocol": "tcp",
+      "port_start": 80,
+      "port_end": 443,
+      "action": "allow",
+      "enabled": true
+    }
+  ],
+
+  "simple_shadow": [
+    {
+      "name": "allow-all-internal",
+      "priority": 10,
+      "source": "10.0.0.0/8",
+      "destination": "10.0.0.0/8",
+      "protocol": "any",
+      "port_start": 0,
+      "port_end": 65535,
+      "action": "allow",
+      "enabled": true
+    },
+    {
+      "name": "allow-web-dmz",
+      "priority": 100,
+      "source": "10.0.0.0/24",
+      "destination": "10.1.0.0/24",
+      "protocol": "tcp",
+      "port_start": 80,
+      "port_end": 443,
+      "action": "allow",
+      "enabled": true
+    }
+  ],
+
+  "chained_shadow": [
+    {
+      "name": "broad-any",
+      "priority": 10,
+      "source": "10.0.0.0/8",
+      "destination": "10.0.0.0/8",
+      "protocol": "any",
+      "port_start": 0,
+      "port_end": 65535,
+      "action": "allow",
+      "enabled": true
+    },
+    {
+      "name": "medium-16",
+      "priority": 20,
+      "source": "10.1.0.0/16",
+      "destination": "10.2.0.0/16",
+      "protocol": "tcp",
+      "port_start": 0,
+      "port_end": 1024,
+      "action": "allow",
+      "enabled": true
+    },
+    {
+      "name": "narrow-24",
+      "priority": 30,
+      "source": "10.1.1.0/24",
+      "destination": "10.2.1.0/24",
+      "protocol": "tcp",
+      "port_start": 80,
+      "port_end": 443,
+      "action": "allow",
+      "enabled": true
+    }
+  ],
+
+  "double_shadow": [
+    {
+      "name": "shadower-one",
+      "priority": 10,
+      "source": "10.0.0.0/8",
+      "destination": "10.0.0.0/8",
+      "protocol": "any",
+      "port_start": 0,
+      "port_end": 65535,
+      "action": "allow",
+      "enabled": true
+    },
+    {
+      "name": "shadower-two",
+      "priority": 20,
+      "source": "10.0.0.0/8",
+      "destination": "10.0.0.0/8",
+      "protocol": "any",
+      "port_start": 0,
+      "port_end": 65535,
+      "action": "deny",
+      "enabled": true
+    },
+    {
+      "name": "victim",
+      "priority": 100,
+      "source": "10.1.1.0/24",
+      "destination": "10.2.2.0/24",
+      "protocol": "tcp",
+      "port_start": 443,
+      "port_end": 443,
+      "action": "allow",
+      "enabled": true
+    }
+  ],
+
+  "redundant_pair": [
+    {
+      "name": "ssh-access-primary",
+      "priority": 50,
+      "source": "192.168.1.0/24",
+      "destination": "10.5.0.0/24",
+      "protocol": "tcp",
+      "port_start": 22,
+      "port_end": 22,
+      "action": "allow",
+      "enabled": true
+    },
+    {
+      "name": "ssh-access-duplicate",
+      "priority": 90,
+      "source": "192.168.1.0/24",
+      "destination": "10.5.0.0/24",
+      "protocol": "tcp",
+      "port_start": 22,
+      "port_end": 22,
+      "action": "allow",
+      "enabled": true
+    }
+  ],
+
+  "overly_permissive": [
+    {
+      "name": "temp-troubleshooting-rule",
+      "priority": 5,
+      "source": "any",
+      "destination": "any",
+      "protocol": "any",
+      "port_start": 0,
+      "port_end": 65535,
+      "action": "allow",
+      "enabled": true
+    }
+  ],
+
+  "permissive_zero_cidr": [
+    {
+      "name": "permissive-written-as-cidr",
+      "priority": 5,
+      "source": "0.0.0.0/0",
+      "destination": "0.0.0.0/0",
+      "protocol": "any",
+      "port_start": 0,
+      "port_end": 65535,
+      "action": "allow",
+      "enabled": true
+    }
+  ],
+
+  "disabled_shadow": [
+    {
+      "name": "disabled-broad-rule",
+      "priority": 10,
+      "source": "10.0.0.0/8",
+      "destination": "10.0.0.0/8",
+      "protocol": "any",
+      "port_start": 0,
+      "port_end": 65535,
+      "action": "allow",
+      "enabled": false
+    },
+    {
+      "name": "narrow-live-rule",
+      "priority": 100,
+      "source": "10.1.1.0/24",
+      "destination": "10.2.2.0/24",
+      "protocol": "tcp",
+      "port_start": 80,
+      "port_end": 443,
+      "action": "allow",
+      "enabled": true
+    }
+  ],
+
+  "tie_priority": [
+    {
+      "name": "tie-rule-alpha",
+      "priority": 50,
+      "source": "10.0.0.0/8",
+      "destination": "10.0.0.0/8",
+      "protocol": "any",
+      "port_start": 0,
+      "port_end": 65535,
+      "action": "allow",
+      "enabled": true
+    },
+    {
+      "name": "tie-rule-beta",
+      "priority": 50,
+      "source": "10.0.0.0/8",
+      "destination": "10.0.0.0/8",
+      "protocol": "any",
+      "port_start": 0,
+      "port_end": 65535,
+      "action": "deny",
+      "enabled": true
+    },
+    {
+      "name": "tie-rule-gamma",
+      "priority": 50,
+      "source": "10.1.0.0/16",
+      "destination": "10.2.0.0/16",
+      "protocol": "tcp",
+      "port_start": 80,
+      "port_end": 80,
+      "action": "allow",
+      "enabled": true
+    }
+  ],
+
+  "mixed_findings": [
+    {
+      "name": "catch-all-allow",
+      "priority": 1,
+      "source": "any",
+      "destination": "any",
+      "protocol": "any",
+      "port_start": 0,
+      "port_end": 65535,
+      "action": "allow",
+      "enabled": true
+    },
+    {
+      "name": "db-access",
+      "priority": 40,
+      "source": "10.20.0.0/16",
+      "destination": "10.30.0.0/16",
+      "protocol": "tcp",
+      "port_start": 5432,
+      "port_end": 5432,
+      "action": "allow",
+      "enabled": true
+    },
+    {
+      "name": "db-access-copy",
+      "priority": 60,
+      "source": "10.20.0.0/16",
+      "destination": "10.30.0.0/16",
+      "protocol": "tcp",
+      "port_start": 5432,
+      "port_end": 5432,
+      "action": "allow",
+      "enabled": true
+    },
+    {
+      "name": "isolated-segment",
+      "priority": 70,
+      "source": "172.16.0.0/24",
+      "destination": "172.17.0.0/24",
+      "protocol": "udp",
+      "port_start": 53,
+      "port_end": 53,
+      "action": "deny",
+      "enabled": true
+    }
+  ],
+
+  "no_findings": [
+    {
+      "name": "segment-a-to-b",
+      "priority": 10,
+      "source": "10.0.0.0/24",
+      "destination": "10.1.0.0/24",
+      "protocol": "tcp",
+      "port_start": 80,
+      "port_end": 80,
+      "action": "allow",
+      "enabled": true
+    },
+    {
+      "name": "segment-c-to-d",
+      "priority": 20,
+      "source": "192.168.5.0/24",
+      "destination": "192.168.6.0/24",
+      "protocol": "udp",
+      "port_start": 514,
+      "port_end": 514,
+      "action": "deny",
+      "enabled": true
+    }
+  ]
+}
