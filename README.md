@@ -89,9 +89,7 @@ The UI is at `http://127.0.0.1:8000` and the generated API documentation at
 
 ## Test report
 
-`pytest-html` output, uploaded as a CI artifact on every run:
-
-![HTML test report showing 284 passed and 0 failed](docs/assets/test-report.png)
+`pytest-html` output is uploaded as a CI artifact on every run.
 
 ## Documentation
 
