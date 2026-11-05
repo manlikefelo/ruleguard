@@ -115,7 +115,7 @@ failing output instead of describing it.
 | RG-BUG-005 | Duplicate rules at equal priority were never reported | Medium |
 | RG-BUG-006 | Full suite deadlocked when API tests ran before UI tests | High |
 
-RG-BUG-003 is the one I would talk about in an interview. The check compared the
+RG-BUG-003 is the most instructive. The check compared the
 source against the literal string `"any"`, so a rule written `0.0.0.0/0` was not
 reported. Both spellings mean the same thing, and device exports use the second.
 The tool returned a clean report on exactly the input it would most often be

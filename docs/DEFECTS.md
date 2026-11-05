@@ -312,7 +312,7 @@ the fix (301 passed in 49.74s).
 
 Across the first unit and API runs, eight distinct failure causes turned up.
 Five were product defects, written up above. The other three were faults in the
-tests themselves, recorded here so the triage is honest about the split:
+tests themselves, recorded here so the triage is clear about the split:
 
 - `test_priority_comparison_boundaries` passed zero and negative priorities to a
   model that validates `priority >= 1`, so the factory raised `ValidationError`
