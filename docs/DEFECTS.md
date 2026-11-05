@@ -8,7 +8,7 @@ in the test framework rather than in the application.
 Every one was written up before the fix went in, which is why the evidence
 sections quote failing output rather than describing it.
 
-Baseline commit for RG-BUG-001 to RG-BUG-005: `110ae71`. Environment: Windows
+Baseline commit for RG-BUG-001 to RG-BUG-005: `a91e8ed`. Environment: Windows
 10, Python 3.12.10, pytest 8.3.4, run locally.
 
 Summary:
@@ -27,7 +27,7 @@ Summary:
 ### RG-BUG-001: Malformed CIDR is accepted on create and crashes the analysis endpoint
 
 **Severity:** Critical **Priority:** P1 **Component:** app/models.py, app/analyzer.py
-**Environment:** local, Python 3.12.10, commit `110ae71`
+**Environment:** local, Python 3.12.10, commit `a91e8ed`
 
 **Steps to reproduce:**
 
@@ -66,7 +66,7 @@ model. Nothing parsed them until `_to_network` did, deep inside the analyzer,
 by which point the bad value was already persisted and there was no route-level
 handler to turn a parse failure into a 4xx.
 
-**Fix:** commit `d85cc30`. Added a field validator on `RuleCreate` that runs the value through
+**Fix:** commit `d99493a`. Added a field validator on `RuleCreate` that runs the value through
 `ipaddress.IPv4Network` at creation time and rejects anything that does not
 parse, including IPv6 input, with an explicit message. Validation now happens
 once at the boundary rather than on every analysis run.
@@ -79,7 +79,7 @@ once at the boundary rather than on every analysis run.
 ### RG-BUG-002: Port ranges that touch at one end are not treated as overlapping
 
 **Severity:** High **Priority:** P2 **Component:** app/analyzer.py
-**Environment:** local, Python 3.12.10, commit `110ae71`
+**Environment:** local, Python 3.12.10, commit `a91e8ed`
 
 **Steps to reproduce:**
 
@@ -109,7 +109,7 @@ using strict inequalities on a range whose bounds are inclusive. Where the two
 ranges share exactly one port, both comparisons fail. Where a range is a single
 port, `a_start < a_end` is false by definition.
 
-**Fix:** commit `d85cc30`. Changed both comparisons to `<=`, giving
+**Fix:** commit `d99493a`. Changed both comparisons to `<=`, giving
 `a_start <= b_end and b_start <= a_end`. The adjacent-range cases such as 80-443
 against 444-500 still correctly report no overlap.
 
@@ -120,7 +120,7 @@ against 444-500 still correctly report no overlap.
 ### RG-BUG-003: Overly permissive rules written as 0.0.0.0/0 are not reported
 
 **Severity:** High **Priority:** P2 **Component:** app/analyzer.py
-**Environment:** local, Python 3.12.10, commit `110ae71`
+**Environment:** local, Python 3.12.10, commit `a91e8ed`
 
 **Steps to reproduce:**
 
@@ -150,7 +150,7 @@ strings against the literal `"any"`. Every other part of the analyzer goes
 through `_to_network`, which already treats the two spellings as equivalent;
 this one check compared raw strings instead.
 
-**Fix:** commit `d85cc30`. Added an `_is_any_network` helper that parses the value and tests
+**Fix:** commit `d99493a`. Added an `_is_any_network` helper that parses the value and tests
 whether it covers the entire address space, then used it for both the source and
 the destination check. Any future spelling that parses to 0.0.0.0/0 is now
 handled without another change.
@@ -162,7 +162,7 @@ handled without another change.
 ### RG-BUG-004: A rule shadowed by two broader rules is reported twice
 
 **Severity:** Medium **Priority:** P3 **Component:** app/analyzer.py
-**Environment:** local, Python 3.12.10, commit `110ae71`
+**Environment:** local, Python 3.12.10, commit `a91e8ed`
 
 **Steps to reproduce:**
 
@@ -189,7 +189,7 @@ twice.
 rule it finds rather than stopping at the first one. There is no deduplication
 by `rule_id`.
 
-**Fix:** commit `d85cc30`. The loop now records the highest-priority covering rule for each
+**Fix:** commit `d99493a`. The loop now records the highest-priority covering rule for each
 shadowed rule and emits a single finding naming it. Reporting the highest
 priority one is the useful choice: that is the rule the operator has to change
 for the shadowed rule to come alive.
@@ -201,7 +201,7 @@ for the shadowed rule to come alive.
 ### RG-BUG-005: Duplicate rules at the same priority are never reported
 
 **Severity:** Medium **Priority:** P3 **Component:** app/analyzer.py
-**Environment:** local, Python 3.12.10, commit `110ae71`
+**Environment:** local, Python 3.12.10, commit `a91e8ed`
 
 **Steps to reproduce:**
 
@@ -229,7 +229,7 @@ source and destination as raw strings, so a pair written as `any` and
 `0.0.0.0/0` is not recognised as duplicated even though the two rules select
 identical traffic. Same underlying cause as RG-BUG-003, fixed in the same pass.
 
-**Fix:** commit `d85cc30`. Replaced the priority guard with a comparison that breaks the tie on
+**Fix:** commit `d99493a`. Replaced the priority guard with a comparison that breaks the tie on
 rule id when priorities are equal, so exactly one of the pair is reported and
 the choice is stable across runs. Network comparison in `is_duplicate` now goes
 through parsed networks rather than string equality.
@@ -241,7 +241,7 @@ through parsed networks rather than string equality.
 ### RG-BUG-006: Full suite deadlocks when the API tests run before the UI tests
 
 **Severity:** High **Priority:** P2 **Component:** test framework
-**Environment:** local, Python 3.12.10, Windows 10, commit `d85cc30`
+**Environment:** local, Python 3.12.10, Windows 10, commit `d99493a`
 
 This one is a defect in the test suite rather than in the application. It is
 recorded here because a suite that hangs is a worse problem than most product
@@ -286,7 +286,7 @@ selector that never fires. Setting an explicit event loop in the server thread
 was not enough; the coupling is through process-level state, not the loop
 object.
 
-**Fix:** commit `1c2ef12`. `live_server` now runs uvicorn as a subprocess, which
+**Fix:** commit `b829865`. `live_server` now runs uvicorn as a subprocess, which
 shares no event loop state with the test process. Startup polls `/health` until
 it answers, with a deadline that fails the fixture rather than hanging.
 

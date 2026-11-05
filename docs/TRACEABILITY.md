@@ -176,4 +176,4 @@ response to a defect, and the covering test would have failed before the fix.
 
 Ten of the 102 requirements are regression coverage, added in response to
 RG-BUG-001 through RG-BUG-005. Each of those tests fails against the code as it
-stood at commit `110ae71`.
+stood at commit `a91e8ed`.
